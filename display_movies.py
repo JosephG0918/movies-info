@@ -3,7 +3,7 @@ import pandas as pd
 from tabulate import tabulate
 
 try:
-    conn = sqlite3.connect("C:\\Users\\jkgos\\CodingWorkspace\\sqliteDB-saves\\movies.db")
+    conn = sqlite3.connect("movies.db") # specify directory to sqlite db.
 except sqlite3.Error as e:
     print(f"Error connecting to SQLite3 database: {e}")
 
