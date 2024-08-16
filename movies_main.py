@@ -16,7 +16,7 @@ def main():
     Function creates a SQLite database and declares a headless Firefox browser instance using Selenium.
     Function calls the scrape_and_store(conn, cursor, browser) method.
     '''
-    conn = sqlite3.connect('C:\\Users\\jkgos\\CodingWorkspace\\sqliteDB-saves\\movies.db')
+    conn = sqlite3.connect('movies.db') # specify directory to Sqlite db.
     cursor = conn.cursor()
 
     options = Options()
