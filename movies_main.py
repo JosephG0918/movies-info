@@ -41,11 +41,11 @@ def scrape_and_store(conn, cursor, browser):
     
     browser.get("https://www.amctheatres.com/movies") 
     soup = BeautifulSoup(browser.page_source, 'html.parser')
-    results = soup.find_all('div', class_='PosterContent')
 
-    for i in range(len(results)):
-        h3_tags = str(soup.find_all('h3')[i].text)
-        movies_list.append(h3_tags)
+    for i in range(len(soup.find_all('div', class_='flex flex-col gap-2'))):
+        results = soup.find_all('div', class_='flex flex-col gap-2')[i]
+        h2_tags = str(results.find_all('h2', class_='sr-only')[0].text)
+        movies_list.append(h2_tags)
 
     for movie in movies_list:
         browser.get("https://www.imdb.com/")
@@ -66,8 +66,8 @@ def scrape_and_store(conn, cursor, browser):
             browser.get(get_url)
             soup = BeautifulSoup(browser.page_source, 'html.parser')
 
-            rating = soup.find_all('span', class_='sc-eb51e184-1 ljxVSS')[0].text
-            featured_user_review = str(soup.find_all('span', class_='sc-27d2f80b-1 dWDIvF')[0].text)
+            rating = soup.find_all('span', class_='sc-c4ffe080-1 iQZtLP')[0].text
+            featured_user_review = str(soup.find_all('span', class_='sc-e1c225f3-7 hwFAtr')[0].text)
         except Exception as e:
             print(f"{e}")
             continue
