@@ -16,7 +16,7 @@ def main():
     Function creates a SQLite database and declares a headless Firefox browser instance using Selenium.
     Function calls the scrape_and_store(conn, cursor, browser) method.
     '''
-    conn = sqlite3.connect('C:\\Users\\jkgos\\CodingWorkspace\\sqliteDB-saves\\movies.db')
+    conn = sqlite3.connect('database\\movies.db')
     cursor = conn.cursor()
 
     options = Options()
@@ -32,7 +32,7 @@ def scrape_and_store(conn, cursor, browser):
     movies_list = []
     cursor.execute('''CREATE TABLE IF NOT EXISTS AMC_MOVIES (
                       id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      date DATE NOT NULL, 
+                      date DATE NOT NULL,
                       movie_title TEXT(50), 
                       IMDb_rating TEXT(5),
                       tomatometer TEXT(5),
@@ -69,8 +69,9 @@ def scrape_and_store(conn, cursor, browser):
             rating = soup.find_all('span', class_='sc-c4ffe080-1 iQZtLP')[0].text
             featured_user_review = str(soup.find_all('span', class_='sc-e1c225f3-7 hwFAtr')[0].text)
         except Exception as e:
-            print(f"{e}")
-            continue
+            rating = None
+            featured_user_review = None
+            print(f"{e}: imdb")
 
         try:
             browser.get("https://www.rottentomatoes.com/")
@@ -85,8 +86,8 @@ def scrape_and_store(conn, cursor, browser):
             soup = BeautifulSoup(browser.page_source, 'html.parser')
             rotten_tomatoes_rating = re.findall('"/m/[a-zA-Z.,!?0-9&$#@*\(\)+-=_/\<\>]+/reviews","scorePercent":"([0-9]+%)","title":"Tomatometer"', str(soup.find_all('div', class_='media-scorecard no-border')[0]))[0]
         except Exception as e:
-            print(f"{e}")
-            continue
+            print(f"{e}: rottentomatoes")
+            rotten_tomatoes_rating = None
         
         today_date = date.today()
         cursor.execute('''INSERT INTO AMC_MOVIES (date, movie_title, IMDb_rating, tomatometer, featured_user_review) VALUES (?, ?, ?, ?, ?)''', (today_date, movie, rating, rotten_tomatoes_rating, featured_user_review))
