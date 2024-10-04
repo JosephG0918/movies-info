@@ -58,7 +58,7 @@ def scrape_and_store(conn, cursor, browser):
             action.move_to_element(searchTextbox).click().send_keys(movie).perform()
             searchTextbox.send_keys(Keys.ENTER)
 
-            searchMovie = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/main/div[2]/div[3]/section/div/div[1]/section[2]/div[2]/ul/li[1]/div[2]/div/a')))
+            searchMovie = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/main/div[2]/div[3]/section/div/div[1]/section[2]/div[2]/ul/li[1]')))
             action.click(searchMovie).perform()
 
             time.sleep(5)
@@ -67,7 +67,7 @@ def scrape_and_store(conn, cursor, browser):
             soup = BeautifulSoup(browser.page_source, 'html.parser')
 
             rating = soup.find_all('span', class_='sc-c4ffe080-1 iQZtLP')[0].text
-            featured_user_review = str(soup.find_all('span', class_='sc-e1c225f3-7 hwFAtr')[0].text)
+            featured_user_review = str(soup.find_all('span', class_='sc-46fa4da3-7 cHtpQf')[0].text)
         except Exception as e:
             rating = None
             featured_user_review = None
@@ -86,8 +86,8 @@ def scrape_and_store(conn, cursor, browser):
             soup = BeautifulSoup(browser.page_source, 'html.parser')
             rotten_tomatoes_rating = re.findall('"/m/[a-zA-Z.,!?0-9&$#@*\(\)+-=_/\<\>]+/reviews","scorePercent":"([0-9]+%)","title":"Tomatometer"', str(soup.find_all('div', class_='media-scorecard no-border')[0]))[0]
         except Exception as e:
-            print(f"{e}: rottentomatoes")
             rotten_tomatoes_rating = None
+            print(f"{e}: rottentomatoes")
         
         today_date = date.today()
         cursor.execute('''INSERT INTO AMC_MOVIES (date, movie_title, IMDb_rating, tomatometer, featured_user_review) VALUES (?, ?, ?, ?, ?)''', (today_date, movie, rating, rotten_tomatoes_rating, featured_user_review))
