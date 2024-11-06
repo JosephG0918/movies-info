@@ -66,8 +66,8 @@ def scrape_and_store(conn, cursor, browser):
             browser.get(get_url)
             soup = BeautifulSoup(browser.page_source, 'html.parser')
 
-            rating = soup.find_all('span', class_='sc-c4ffe080-1 iQZtLP')[0].text
-            featured_user_review = str(soup.find_all('span', class_='sc-46fa4da3-7 cHtpQf')[0].text)
+            rating = soup.find_all('span', class_='sc-d541859f-1 imUuxf')[0].text
+            featured_user_review = str(soup.find_all('div', class_='sc-a2ac93e5-5 feMBGz')[0].text)
         except Exception as e:
             rating = None
             featured_user_review = None
