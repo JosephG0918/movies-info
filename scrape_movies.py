@@ -6,17 +6,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
-import time
-import sqlite3
+import time, sqlite3, re, requests
 from datetime import date
-import re
+from difflib import SequenceMatcher
 
 def main():
-    '''
-    Function creates a SQLite database and declares a headless Firefox browser instance using Selenium.
-    Function calls the scrape_and_store(conn, cursor, browser) method.
-    '''
-    conn = sqlite3.connect('database\\movies.db')
+    conn = sqlite3.connect('database/movies.db')
     cursor = conn.cursor()
 
     options = Options()
@@ -26,71 +21,86 @@ def main():
     scrape_and_store(conn, cursor, browser)
 
 def scrape_and_store(conn, cursor, browser):
-    '''
-    Function web scrapes movie titles, star ratings, and user reviews of movies, then populates a SQLite database with all of that data.
-    '''
-    movies_list = []
-    cursor.execute('''CREATE TABLE IF NOT EXISTS AMC_MOVIES (
-                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      date DATE NOT NULL,
-                      movie_title TEXT(50), 
-                      IMDb_rating TEXT(5),
-                      tomatometer TEXT(5),
-                      featured_user_review TEXT(200)
-                      )''')
-    
-    browser.get("https://www.amctheatres.com/movies") 
-    soup = BeautifulSoup(browser.page_source, 'html.parser')
+    headers = {"User-Agent": "Mozilla/5.0"}
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS AMC_MOVIES (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            movie_title TEXT(50),
+            IMDb_rating TEXT(5),
+            tomatometer TEXT(5),
+            featured_user_review TEXT(200)
+        )
+    ''')
 
-    for i in range(len(soup.find_all('div', class_='flex flex-col gap-2'))):
-        results = soup.find_all('div', class_='flex flex-col gap-2')[i]
-        h2_tags = str(results.find_all('h2', class_='sr-only')[0].text)
-        movies_list.append(h2_tags)
+    # Get list of movie titles from AMC website
+    browser.get("https://www.amctheatres.com/movies")
+    soup = BeautifulSoup(browser.page_source, 'html.parser')
+    movies_list = [
+        div.find('h2', class_='sr-only').text
+        for div in soup.find_all('div', class_='flex flex-col gap-2')
+    ]
+
+    wait = WebDriverWait(browser, 30)
+    action = ActionChains(browser)
 
     for movie in movies_list:
-        browser.get("https://www.imdb.com/")
-
-        action = ActionChains(browser)
-        wait = WebDriverWait(browser, 30)
-
+        # IMDb Scraping
+        rating, featured_user_review = None, None
         try:
-            searchTextbox = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="suggestion-search"]')))
-            action.move_to_element(searchTextbox).click().send_keys(movie).perform()
-            searchTextbox.send_keys(Keys.ENTER)
+            browser.get("https://www.imdb.com/")
+            searchBox = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="suggestion-search"]')))
+            action.move_to_element(searchBox).click().send_keys(movie).send_keys(Keys.ENTER).perform()
 
-            searchMovie = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/main/div[2]/div[3]/section/div/div[1]/section[2]/div[2]/ul/li[1]')))
+            searchMovie = wait.until(EC.presence_of_element_located(
+                (By.XPATH, '//*[@id="__next"]/main/div[2]/div[3]/section/div/div[1]/section[2]/div[2]/ul/li[1]')
+            ))
             action.click(searchMovie).perform()
-
             time.sleep(5)
-            get_url = str(browser.current_url)
+
+            get_url = browser.current_url
             browser.get(get_url)
             soup = BeautifulSoup(browser.page_source, 'html.parser')
+            req = requests.get(get_url, headers=headers)
+            soup_bs4 = BeautifulSoup(req.content, 'html.parser')
+            movieMatch = soup_bs4.find('span', class_='hero__primary-text').text
 
-            rating = soup.find_all('span', class_='sc-d541859f-1 imUuxf')[0].text
-            featured_user_review = str(soup.find_all('div', class_='sc-a2ac93e5-5 feMBGz')[0].text)
+            # Check if the found movie title closely matches the expected title
+            if SequenceMatcher(None, movieMatch, movie).ratio() >= 0.9:
+                # Extract rating and featured review if titles match closely
+                rating = soup.find('span', class_='sc-d541859f-1 imUuxf').text
+                featured_user_review = soup.find('div', class_='sc-8c7aa573-5 gBEznl').text
         except Exception as e:
-            rating = None
-            featured_user_review = None
-            print(f"{e}: imdb")
+            print(f"{e}: IMDb scraping issue")
 
+        # Rotten Tomatoes Scraping
+        rotten_tomatoes_rating = None
         try:
             browser.get("https://www.rottentomatoes.com/")
-            searchTextbox = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="header-main"]/search-results-nav/search-results-controls/input')))
-            action.move_to_element(searchTextbox).click().send_keys(movie).perform()
-            searchTextbox.send_keys(Keys.ENTER)
+            searchBox = wait.until(EC.presence_of_element_located(
+                (By.XPATH, '//*[@id="header-main"]/search-results-nav/search-results-controls/input')
+            ))
+            action.move_to_element(searchBox).click().send_keys(movie).send_keys(Keys.ENTER).perform()
 
-            searchMovie = wait.until(EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/main/div[1]/div/section[1]/div/search-page-result[1]/ul/search-page-media-row[1]/a[2]')))
+            searchMovie = wait.until(EC.presence_of_element_located(
+                (By.XPATH, '/html/body/div[3]/main/div[1]/div/section[1]/div/search-page-result[1]/ul/search-page-media-row[1]/a[2]')
+            ))
             action.click(searchMovie).perform()
-
             time.sleep(5)
+
             soup = BeautifulSoup(browser.page_source, 'html.parser')
-            rotten_tomatoes_rating = re.findall('"/m/[a-zA-Z.,!?0-9&$#@*\(\)+-=_/\<\>]+/reviews","scorePercent":"([0-9]+%)","title":"Tomatometer"', str(soup.find_all('div', class_='media-scorecard no-border')[0]))[0]
+            rating_match = re.search('[0-9]+%', soup.find('rt-text', slot='criticsScore').text)
+            if rating_match:
+                rotten_tomatoes_rating = rating_match.group()
         except Exception as e:
-            rotten_tomatoes_rating = None
-            print(f"{e}: rottentomatoes")
-        
+            print(f"{e}: Rotten Tomatoes scraping issue")
+
         today_date = date.today()
-        cursor.execute('''INSERT INTO AMC_MOVIES (date, movie_title, IMDb_rating, tomatometer, featured_user_review) VALUES (?, ?, ?, ?, ?)''', (today_date, movie, rating, rotten_tomatoes_rating, featured_user_review))
+        cursor.execute('''
+            INSERT INTO AMC_MOVIES 
+            (date, movie_title, IMDb_rating, tomatometer, featured_user_review) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (today_date, movie, rating, rotten_tomatoes_rating, featured_user_review))
         conn.commit()
 
     conn.close()
